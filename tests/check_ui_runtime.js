@@ -1,0 +1,37 @@
+'use strict';
+const fs=require('fs'),path=require('path'),vm=require('vm'),assert=require('assert');
+const html=fs.readFileSync(path.join(process.argv[2],'ui/index.html'),'utf8');
+const elements=new Map();
+const element=id=>{
+ if(!elements.has(id))elements.set(id,{value:0,min:0,max:182,clientWidth:500,dataset:{},style:{setProperty(){}},classList:{toggle(){},add(){},remove(){}},setAttribute(){},addEventListener(){},getContext(){return {};},closest(){return element('adjust');},querySelector(selector){return element(selector);}});
+ return elements.get(id);
+};
+const pending=[];
+const context=vm.createContext({console,Math,Number,String,Date,AbortSignal,document:{hidden:false,getElementById:element},window:{addEventListener(){}},requestAnimationFrame(){return 1;},setTimeout(){return 1;},fetch(url){return new Promise((resolve,reject)=>pending.push({url,resolve,reject}));}});
+vm.runInContext([...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].map(m=>m[1]).join('\n'),context);
+const state=radius=>({enabled:true,radius,angle:180,width:60,rightRadius:0,rightAngle:180,rightWidth:60,source:'home',connected:true,fresh:true,lx:100,ly:128,rx:128,ry:128,timestamp:100,gamePid:0,gameEnabled:false,gameError:'',firmware:'10.20',saved:true,saveError:''});
+const flush=()=>new Promise(setImmediate);
+const answer=(request,data)=>request.resolve({ok:true,json:async()=>data});
+(async()=>{
+ answer(pending.shift(),state(10));await flush();
+ vm.runInContext('poll()',context);const old=pending.shift();
+ vm.runInContext("command('/api/apply','radius=50')",context);const command=pending.shift();
+ answer(command,state(50));await flush();answer(old,state(10));await flush();
+ assert.strictEqual(vm.runInContext('state.radius',context),50,'late poll must not overwrite a successful command');
+ vm.runInContext('setDraft(80);poll()',context);pending.shift().reject(Error('network lost'));await flush();
+ vm.runInContext('poll()',context);answer(pending.shift(),state(50));await flush();
+ assert.strictEqual(vm.runInContext('draft',context),80,'reconnection must preserve the draft');
+ vm.runInContext('width=60;setDraft(182)',context);
+ assert(!element('warnbox').textContent.includes('every position of the stick'),'maximum cone must not claim to block every direction');
+ vm.runInContext('acceptState('+JSON.stringify({...state(50),homeAvailable:false,homeError:'Home unavailable',gamePid:42,gameEnabled:true})+')',context);
+ assert(element('current').textContent.includes('Home unavailable'),'missing home must be explicit');
+ assert.strictEqual(element('disable').disabled,false,'game disable must remain available');
+ assert.strictEqual(vm.runInContext('draft',context),182,'home failure must not replace a draft');
+ vm.runInContext('copyDraft('+JSON.stringify(state(50))+');acceptState('+JSON.stringify({...state(50),saved:false,saveError:'Saving failed'})+')',context);
+ assert.strictEqual(element('apply').disabled,false,'failed save must allow retry without changing the setting');
+ assert(element('current').textContent.includes('Saving failed'),'poll must retain the persistence error');
+ assert(!element('current').textContent.includes('restored after reboot'),'a saved flag is not proof of a reboot');
+ vm.runInContext('acceptState('+JSON.stringify({...state(50),enabled:false,saved:false,saveError:'Cannot clear saved setting'})+')',context);
+ assert.strictEqual(element('disable').disabled,false,'failed deletion must allow retry even when filters are off');
+ console.log('PASS: production UI scripts, reordered responses, reconnect draft, maximum cone warning (test DOM and fetch)');
+})().catch(error=>{console.error(error);process.exitCode=1;});

@@ -1,0 +1,355 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0b0e14">
+<title>PS5 DualSense Deadzone</title>
+<style>
+:root{color-scheme:dark;--bg:#0b0e14;--bg2:#0e131c;--panel:#131926;--panel2:#182031;--line:#253044;--line2:#2f3d55;--muted:#8a97ad;--dim:#5b6880;--text:#e9effa;--accent:#39e0a8;--accent2:#7dffd6;--blue:#7aa8ff;--warn:#ffb454;--err:#ff7a7a;--r:18px}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html{height:100%}
+body{margin:0;min-height:100%;background:radial-gradient(1200px 600px at 70% -10%,#14203055 0%,transparent 60%),var(--bg);color:var(--text);font:15px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;transition:background-color .3s}
+button,input,output{font:inherit}button{cursor:pointer}button:disabled{cursor:default;opacity:.35}
+button:focus-visible,input:focus-visible,canvas:focus-visible{outline:3px solid var(--blue);outline-offset:4px}
+button{border:1px solid var(--line);background:var(--panel);color:var(--text);border-radius:12px;padding:12px 18px;font-weight:600;transition:background .15s,border-color .15s,transform .06s,opacity .15s}
+button:hover:not(:disabled){background:var(--panel2);border-color:var(--line2)}
+button:active:not(:disabled){transform:scale(.97)}
+header{position:sticky;top:0;z-index:10;height:64px;max-width:1280px;margin:auto;padding:0 24px;display:flex;align-items:center;justify-content:space-between;gap:12px;background:linear-gradient(180deg,#0b0e14ee,#0b0e14cc);backdrop-filter:blur(8px);border-bottom:1px solid var(--line)}
+.brand{display:flex;align-items:center;gap:11px;font-weight:650;letter-spacing:-.3px;font-size:17px;white-space:nowrap}
+.brand svg{width:28px;height:28px;flex:none}
+.tag{font-size:10px;font-weight:700;letter-spacing:1.6px;text-transform:uppercase;color:var(--dim);margin-left:2px}
+.connection{display:flex;align-items:center;gap:8px;color:var(--muted);font-size:12px;font-weight:550}
+.dot{width:8px;height:8px;background:var(--dim);border-radius:50%;transition:background .3s,box-shadow .3s}
+.connection.live .dot{background:var(--accent);box-shadow:0 0 12px #39e0a866}
+.connection.live{color:var(--accent)}
+main{max-width:1280px;margin:0 auto;padding:26px 24px 30px}
+.intro{display:flex;justify-content:space-between;gap:20px;align-items:flex-end;margin-bottom:20px}
+.eyebrow{font-size:11px;font-weight:700;letter-spacing:1.8px;text-transform:uppercase;color:var(--accent);margin:0 0 7px}
+h1{font-size:clamp(22px,3.4vw,31px);font-weight:600;letter-spacing:-1px;margin:0 0 7px}
+.description{color:var(--muted);max-width:640px;margin:0}
+.scope{font-size:11.5px;color:var(--dim);text-align:right;white-space:nowrap;line-height:1.6}
+.layout{display:grid;grid-template-columns:minmax(0,1.42fr) minmax(330px,1fr);gap:18px;align-items:start}
+.panel{background:linear-gradient(180deg,#ffffff07,#ffffff00 140px),var(--panel);border:1px solid var(--line);border-radius:var(--r);overflow:hidden;box-shadow:inset 0 1px 0 #ffffff0a,0 24px 60px -30px #000c;transition:border-color .3s}
+.panel.offline{border-color:#3a3044}
+.plot-head{display:flex;align-items:center;justify-content:space-between;padding:20px 22px 0;gap:12px}
+.panel-title{font-size:15px;font-weight:600;letter-spacing:-.2px}
+.chip{font-size:10.5px;font-weight:700;letter-spacing:1.3px;text-transform:uppercase;padding:5px 11px;border-radius:99px;background:var(--panel2);color:var(--muted);border:1px solid var(--line);transition:all .3s}
+.chip.live{background:#0e2b22;color:var(--accent);border-color:#1d4a3a}
+.chip.warn{background:#2b2313;color:var(--warn);border-color:#4a3a1d}
+.plot-wrap{max-width:700px;margin:0 auto;padding:14px 18px 6px;position:relative}
+canvas#plot{width:100%;aspect-ratio:1;display:block;border-radius:12px;touch-action:none;cursor:crosshair}
+.plot-footer{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:8px 22px 16px;font-size:12px;color:var(--dim)}
+.idle-hint{margin:0 22px 14px;padding:10px 12px;border:1px solid #4a3a1d;background:#2b2313;color:var(--warn);border-radius:10px;font-size:12.5px;line-height:1.5}
+.legend{display:flex;gap:16px}
+.legend span{display:flex;align-items:center;gap:6px}
+.legend i{width:9px;height:9px;border-radius:50%;background:var(--blue)}
+.legend i.filtered{background:var(--accent)}
+.adjust{padding:20px 22px 22px}
+.picker{margin-bottom:16px}
+.picker .pad{display:block;width:100%;max-width:300px;height:auto;margin:0 auto}
+.pad .body{fill:url(#pBody);stroke:#2f3b52;stroke-width:1.5}
+.pad .core{fill:#0f141e}
+.pad .touch{fill:url(#pTouch);stroke:#2a3549;stroke-width:1.2}
+.pad .bar{stroke:var(--blue);stroke-width:3;stroke-linecap:round;opacity:.55;filter:url(#pGlow)}
+.pad .btn{fill:#1e2738;stroke:#334058;stroke-width:1}
+.pad .well{fill:#0a0e15;stroke:#232d40;stroke-width:1.2}
+.pad .capc{fill:url(#pCap);stroke:#46546e;stroke-width:1.5;transition:stroke .2s}
+.pad .dish{fill:none;stroke:#2a3448;stroke-width:1.2}
+.pad .cap{transition:transform .1s linear}
+.pad .halo{fill:url(#pHalo);opacity:0;transition:opacity .25s}
+.pad .st{cursor:pointer;transition:opacity .2s}
+.pad .st:hover .capc{stroke:#6c7fa0}
+.picker[data-sel="0"] .s0 .halo,.picker[data-sel="1"] .s1 .halo{opacity:1}
+.picker[data-sel="0"] .s0 .capc,.picker[data-sel="1"] .s1 .capc{stroke:var(--accent);stroke-width:2.5}
+.picker[data-sel="0"] .s1,.picker[data-sel="1"] .s0{opacity:.55}
+.pick{display:grid;grid-template-columns:1fr 1fr;max-width:210px;margin:4px auto 0}
+.pick button{all:unset;cursor:pointer;display:flex;justify-content:center;align-items:center;padding:6px;border-radius:10px;color:var(--dim);font-size:12.5px;font-weight:600;transition:color .2s,background .2s,box-shadow .2s}
+.pick button:focus-visible{outline:3px solid var(--blue);outline-offset:2px}
+.pick button:disabled{opacity:.35;cursor:default}
+.pick .ico{display:none}
+.pick .txt{display:flex;align-items:center;gap:7px}
+.pick .big{display:inline-grid;place-items:center;width:20px;height:20px;border-radius:6px;border:1px solid var(--line2);font-size:11px;font-weight:700}
+.pick button[aria-pressed="true"]{color:var(--accent)}
+.pick button[aria-pressed="true"] .big{border-color:var(--accent);background:#0e2b22}
+.pick .ico-well{fill:none;stroke:#2a3448;stroke-width:2}
+.pick .ico-cap{fill:#1b2333;stroke:#46546e;stroke-width:2;transition:all .2s}
+.pick .ico-dish{fill:none;stroke:#34405a;stroke-width:1.5}
+.pick button[aria-pressed="true"] .ico-cap{stroke:var(--accent);fill:#123a2e}
+@media(max-width:860px){
+ .picker .pad{display:none}
+ .pick{gap:8px;max-width:none;margin:0;padding:4px;border-radius:16px;background:var(--bg2);border:1px solid var(--line)}
+ .pick button{justify-content:flex-start;gap:12px;padding:10px 14px;border-radius:12px;color:var(--muted)}
+ .pick button:hover:not(:disabled){background:#ffffff06}
+ .pick .ico{display:block;width:38px;height:38px;flex:none}
+ .pick .txt{display:block}
+ .pick .big,.pick button[aria-pressed="true"] .big{display:block;width:auto;height:auto;border:0;background:none;font-size:24px;font-weight:750;line-height:1}
+ .pick .nm{display:block;font-size:11.5px;color:var(--dim);font-weight:500;margin-top:2px}
+ .pick button[aria-pressed="true"]{background:#0e2b22;box-shadow:inset 0 0 0 1px #1d4a3a,0 6px 18px -8px #39e0a866}
+}
+.seg{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:16px}
+.seg button{padding:11px;border-radius:12px;color:var(--muted);background:var(--bg2);transition:all .15s}
+.seg button[aria-pressed="true"]{border-color:var(--accent);color:var(--accent);background:#0e2b22}
+.seg button[aria-pressed="true"]:hover{background:#12352a}
+.seg .mode{display:flex;align-items:center;justify-content:center;gap:10px;text-align:left;padding:9px 12px;line-height:1.25}
+.mode svg{width:30px;height:30px;flex:none}
+.mode .m-ring{fill:none;stroke:currentColor;stroke-opacity:.35}
+.mode .m-zone{fill:currentColor;fill-opacity:.22;stroke:currentColor;stroke-width:1.5;stroke-linejoin:round}
+.mode .m-dot{fill:currentColor}
+.mode .m-axis{stroke:currentColor;stroke-opacity:.18}
+.mode small{display:block;font-size:11px;font-weight:500;color:var(--dim)}
+.section-label{font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--dim)}
+.radius-head{display:flex;align-items:baseline;gap:7px;margin:6px 0 2px}
+.radius-number{font-size:52px;font-weight:650;letter-spacing:-2px;line-height:1;font-variant-numeric:tabular-nums;transition:color .25s}
+.unit{font-size:19px;color:var(--muted);font-weight:550}
+.status{margin:14px 0 4px;padding:10px 12px;border-radius:12px;background:var(--bg2);border:1px solid var(--line)}
+.current{font-size:12.5px;color:var(--muted);margin:0;min-height:19px;display:flex;align-items:center;gap:8px}
+.current::before{content:'';flex:none;width:6px;height:6px;border-radius:50%;background:currentColor;opacity:.8}
+.current+.current{margin-top:4px}
+#gameStatus{transition:color .3s}
+.inputSrc{font-size:11px;color:var(--dim);margin:6px 0 0 14px}
+.cone-controls{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin:16px 0 8px}
+.cone-controls label{font-size:12px;color:var(--muted);display:block}
+.cone-controls output{display:block;color:var(--text);font-size:17px;margin:4px 0 6px;font-variant-numeric:tabular-nums}
+input[type=range]{width:100%;height:24px;margin:0;background:transparent;-webkit-appearance:none;appearance:none;cursor:pointer}
+input[type=range]:disabled{opacity:.4;cursor:default}
+input[type=range]::-webkit-slider-runnable-track{height:4px;border-radius:99px;background:linear-gradient(90deg,var(--accent) var(--p,0%),var(--line2) var(--p,0%))}
+input[type=range]::-moz-range-track{height:4px;border-radius:99px;background:var(--line2)}
+input[type=range]::-moz-range-progress{height:4px;border-radius:99px;background:var(--accent)}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:18px;height:18px;margin-top:-7px;border-radius:50%;background:#eafff7;border:3px solid var(--accent);box-shadow:0 0 0 4px #39e0a822,0 2px 6px #0008;transition:transform .12s}
+input[type=range]::-moz-range-thumb{width:12px;height:12px;border-radius:50%;background:#eafff7;border:3px solid var(--accent);box-shadow:0 0 0 4px #39e0a822,0 2px 6px #0008}
+input[type=range]:active:not(:disabled)::-webkit-slider-thumb{transform:scale(1.15)}
+.slider-row{display:grid;grid-template-columns:52px 1fr 52px;gap:12px;align-items:center;margin:10px 0 2px}
+.step{padding:12px 0;font-size:19px;font-weight:650;border-radius:12px}
+.scale{display:flex;justify-content:space-between;font-size:10.5px;color:var(--dim);margin-top:6px}
+.note{font-size:12.5px;color:var(--dim);margin:12px 0 0;transition:color .25s}
+.note.extreme{color:var(--warn)}
+.waiting input[type=range]{visibility:hidden}
+.warnbox{font-size:12.5px;color:var(--warn);background:#241d1033;border:1px solid #4a3a1d66;border-radius:10px;padding:9px 12px;margin:10px 0 0;display:none}
+.warnbox.show{display:block}
+.divider{height:1px;background:var(--line);margin:18px 0}
+.stats{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.stat-label{font-size:11px;color:var(--dim);margin:0 0 5px;letter-spacing:.3px}
+.stat-value{font-size:22px;font-weight:600;font-variant-numeric:tabular-nums}
+.stat-value small{font-size:12px;color:var(--muted);margin-left:3px}
+.meter{height:4px;background:var(--bg2);border-radius:99px;margin-top:7px;position:relative;overflow:hidden}
+.meter::after{content:'';position:absolute;left:50%;top:-2px;bottom:-2px;width:1px;background:var(--line2)}
+.meter span{position:absolute;top:0;bottom:0;left:50%;background:var(--blue);border-radius:99px;transition:left .08s linear,width .08s linear}
+.amplitude{display:flex;justify-content:space-between;align-items:center;font-size:12.5px;color:var(--muted);margin-top:16px;padding-top:14px;border-top:1px solid var(--line)}
+.amplitude strong{font-size:19px;color:var(--text);font-variant-numeric:tabular-nums}
+.output-state{display:flex;justify-content:space-between;align-items:center;font-size:12.5px;margin-top:12px;padding:9px 13px;border-radius:10px;background:var(--bg2);border:1px solid var(--line);transition:all .2s}
+.output-state .st{font-weight:650}
+.output-state.dead{border-color:#1d4a3a;background:#0e2b22}
+.output-state.dead .st{color:var(--accent)}
+.actions{display:grid;grid-template-columns:1.3fr 1fr .8fr .8fr;gap:10px;margin-top:18px}
+#apply{background:linear-gradient(180deg,#4cf0b8,#2fcf98);border-color:#5ff5c3;color:#04140e;font-weight:700;box-shadow:0 8px 24px -10px #39e0a8aa}
+#apply:hover:not(:disabled){background:linear-gradient(180deg,#62f7c6,#39e0a8);border-color:#7dffd6}
+#apply:disabled{background:var(--panel2);border-color:var(--line);color:var(--muted);box-shadow:none}
+#apply.busy{animation:pulse 1s infinite}
+@keyframes pulse{50%{opacity:.55}}
+#disable{color:var(--warn)}
+#disable:hover:not(:disabled){background:#241d10;border-color:#4a3a1d}
+#reset{color:var(--muted);padding:12px 8px}
+.pending{text-align:center;font-size:12px;color:var(--accent);min-height:18px;margin-top:10px;font-weight:600}
+.message{min-height:22px;margin-top:10px;font-size:13px;text-align:center;color:var(--muted);transition:color .2s}
+.message.error{color:var(--err)}
+.help{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-top:18px}
+.help article{display:flex;gap:12px;background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px 16px}
+.help b{flex:none;width:26px;height:26px;border-radius:8px;background:var(--panel2);border:1px solid var(--line);color:var(--accent);display:grid;place-items:center;font-size:13px}
+.help div{font-size:12.5px;color:var(--muted)}
+.help strong{display:block;color:var(--text);margin-bottom:2px;font-size:13px}
+footer{max-width:1280px;margin:26px auto 0;padding:16px 24px 28px;border-top:1px solid var(--line);display:flex;justify-content:space-between;gap:10px;font-size:11.5px;color:var(--dim);flex-wrap:wrap}
+@media(max-width:860px){header{padding:0 16px;height:58px}.tag{display:none}main{padding:18px 14px 20px}.intro{display:block}.scope{display:none}.layout{grid-template-columns:1fr}.plot-wrap{max-width:560px;margin:0 auto}.help{grid-template-columns:1fr;gap:10px}.adjust{padding:16px 16px 18px}.radius-number{font-size:44px}.cone-controls{gap:10px}.actions{grid-template-columns:1fr 1fr;gap:8px}#reset,#quit{padding:11px}footer{flex-direction:column;gap:5px;padding-left:16px}}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+<header><div class="brand"><svg viewBox="0 0 32 32" fill="none" aria-hidden="true"><circle cx="16" cy="16" r="12" stroke="#39e0a8" stroke-width="1.5"/><circle cx="16" cy="16" r="5" fill="#39e0a8" fill-opacity=".18" stroke="#39e0a8"/><path d="M16 1v7m0 16v7M1 16h7m16 0h7" stroke="#39e0a8"/></svg>PS5 DualSense Deadzone</div><div id="connection" class="connection" role="status"><i class="dot"></i><span id="connectionText">Connecting to the console…</span></div></header>
+<main>
+<section class="intro"><div><p class="eyebrow" id="eyebrow">Calibration · Left stick</p><h1>Kill the drift. Keep the control.</h1><p class="description">Move the controller on your PS5. The blue dot follows the stick; the green zone is what gets ignored.</p></div><p class="scope">Home screen + supported games<br>Direct controller read-out</p></section>
+<div class="layout">
+<section class="panel offline" id="plotPanel"><div class="plot-head"><span class="panel-title">Stick position</span><span class="chip" id="plotBadge">STANDBY</span></div><div class="plot-wrap"><canvas id="plot" tabindex="0" role="img" aria-label="Stick position and deadzone shape. Use the Angle, Width and Range controls."></canvas></div><div class="plot-footer"><div class="legend"><span><i></i>Raw input</span><span><i class="filtered"></i>Filtered preview</span></div><span>Drag to aim &amp; resize</span></div><p class="idle-hint" id="idleHint" hidden>Both sticks have stayed centered. Move a stick to check the read-out; centered samples alone do not prove that input is unavailable.</p></section>
+<section class="panel adjust">
+<div class="picker" id="picker" data-sel="0"><svg class="pad" viewBox="0 0 400 270" aria-hidden="true"><defs><linearGradient id="pBody" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2a3446"/><stop offset="1" stop-color="#181f2d"/></linearGradient><linearGradient id="pTouch" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#151b28"/><stop offset="1" stop-color="#10151f"/></linearGradient><radialGradient id="pCap" cx=".4" cy=".35" r=".75"><stop offset="0" stop-color="#3b475e"/><stop offset="1" stop-color="#1a2131"/></radialGradient><radialGradient id="pHalo"><stop offset="0" stop-color="#39e0a8" stop-opacity=".45"/><stop offset="1" stop-color="#39e0a8" stop-opacity="0"/></radialGradient><filter id="pGlow" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="2"/></filter></defs><path class="body" d="M200 22C160 22 120 22 92 30C62 38 40 52 30 80C16 120 6 170 6 205C6 240 22 262 48 262C72 262 86 246 98 226C110 206 124 196 150 196L250 196C276 196 290 206 302 226C314 246 328 262 352 262C378 262 394 240 394 205C394 170 384 120 370 80C360 52 338 38 308 30C280 22 240 22 200 22Z"/><path class="core" d="M120 30L280 30L270 118Q266 128 254 128L146 128Q134 128 130 118Z"/><path class="touch" d="M142 28H258Q266 28 265 36L258 104Q257 112 249 112H151Q143 112 142 104L135 36Q134 28 142 28Z"/><path class="bar" d="M133 40L139 100M267 40L261 100"/><rect class="btn" x="71" y="64" width="14" height="20" rx="4"/><rect class="btn" x="71" y="112" width="14" height="20" rx="4"/><rect class="btn" x="44" y="91" width="20" height="14" rx="4"/><rect class="btn" x="92" y="91" width="20" height="14" rx="4"/><circle class="btn" cx="322" cy="76" r="9.5"/><circle class="btn" cx="300" cy="98" r="9.5"/><circle class="btn" cx="344" cy="98" r="9.5"/><circle class="btn" cx="322" cy="120" r="9.5"/><rect class="btn" x="108" y="36" width="9" height="17" rx="4.5"/><rect class="btn" x="283" y="36" width="9" height="17" rx="4.5"/><circle class="btn" cx="200" cy="150" r="8"/><rect class="btn" x="190" y="170" width="20" height="6" rx="3"/><g class="st s0" data-pick="0"><circle class="halo" cx="150" cy="152" r="46"/><circle class="well" cx="150" cy="152" r="27"/><g class="cap" id="cap0"><circle class="capc" cx="150" cy="152" r="19"/><circle class="dish" cx="150" cy="152" r="12"/></g></g><g class="st s1" data-pick="1"><circle class="halo" cx="250" cy="152" r="46"/><circle class="well" cx="250" cy="152" r="27"/><g class="cap" id="cap1"><circle class="capc" cx="250" cy="152" r="19"/><circle class="dish" cx="250" cy="152" r="12"/></g></g></svg><div class="pick" role="group" aria-label="Stick"><button id="stickLeft" aria-pressed="true"><svg class="ico" viewBox="0 0 40 40" aria-hidden="true"><circle class="ico-well" cx="20" cy="20" r="17"/><circle class="ico-cap" cx="20" cy="20" r="11"/><circle class="ico-dish" cx="20" cy="20" r="6"/></svg><span class="txt"><span class="big">L</span><span class="nm">Left stick</span></span></button><button id="stickRight" aria-pressed="false"><svg class="ico" viewBox="0 0 40 40" aria-hidden="true"><circle class="ico-well" cx="20" cy="20" r="17"/><circle class="ico-cap" cx="20" cy="20" r="11"/><circle class="ico-dish" cx="20" cy="20" r="6"/></svg><span class="txt"><span class="big">R</span><span class="nm">Right stick</span></span></button></div></div>
+<div class="seg" role="group" aria-label="Deadzone shape"><button id="modeCone" class="mode" aria-pressed="true"><svg viewBox="0 0 36 36" aria-hidden="true"><circle class="m-ring" cx="18" cy="18" r="16"/><path class="m-axis" d="M2 18H34M18 2V34"/><path class="m-zone" d="M18 18L5.71 9.4A15 15 0 0 0 5.71 26.6Z"/><circle class="m-dot" cx="18" cy="18" r="2"/></svg><span>Cone<small>One direction only</small></span></button><button id="modeCircle" class="mode" aria-pressed="false"><svg viewBox="0 0 36 36" aria-hidden="true"><circle class="m-ring" cx="18" cy="18" r="16"/><path class="m-axis" d="M2 18H34M18 2V34"/><circle class="m-zone" cx="18" cy="18" r="10"/><circle class="m-dot" cx="18" cy="18" r="2"/></svg><span>Circle<small>Every direction</small></span></button></div>
+<div class="section-label" id="rangeLabel">Cone range</div>
+<div class="radius-head"><output id="radiusValue" class="radius-number" for="radius">—</output><span class="unit">%</span></div>
+<div class="status"><p id="current" class="current">Reading active setting…</p><p id="gameStatus" class="current" role="status">Looking for a game…</p><p id="inputSource" class="inputSrc"></p></div>
+<div class="cone-controls"><label for="angle">Angle<output id="angleValue" for="angle">—</output><input id="angle" type="range" min="0" max="359" step="1" value="180" disabled></label><label for="width">Total width<output id="widthValue" for="width">—</output><input id="width" type="range" min="1" max="180" step="1" value="60" disabled></label></div>
+<div class="slider-row"><button class="step" id="minus" aria-label="Decrease deadzone">−</button><input class="slider" id="radius" aria-label="Cone range" type="range" min="0" max="182" step="1" value="129" disabled><button class="step" id="plus" aria-label="Increase deadzone">+</button></div>
+<div class="scale"><span>0 %</span><span>100 % = full axis tilt</span><span>142 %</span></div>
+<p class="note" id="note">Inside the cone, movement snaps back to center.</p>
+<p class="warnbox" id="warnbox"></p>
+<div class="divider"></div>
+<div class="stats"><div><p class="stat-label">Horizontal · left / right</p><div class="stat-value"><span id="xValue">—</span><small>%</small></div><div class="meter"><span id="xMeter"></span></div></div><div><p class="stat-label">Vertical · down / up</p><div class="stat-value"><span id="yValue">—</span><small>%</small></div><div class="meter"><span id="yMeter"></span></div></div></div>
+<div class="amplitude"><span>Actual distance from center</span><strong id="amplitude">—</strong></div>
+<div class="output-state" id="outputStateBox"><span>Draft preview</span><span class="st" id="outputState">Read-out unavailable</span></div>
+<div class="actions"><button id="apply" disabled>Apply</button><button id="disable" disabled>Disable filter</button><button id="reset" disabled>Reset</button><button id="quit" disabled>Quit</button></div>
+<p class="pending" id="pending"></p>
+<p class="message" id="message" role="status"></p>
+</section>
+<section class="help"><article><b>1</b><div><strong>Rest the stick</strong>The blue dot reveals the drift's direction and strength.</div></article><article><b>2</b><div><strong>Aim at the drifting side</strong>Pick Circle for all directions, or Cone to target only the side that drifts.</div></article><article><b>3</b><div><strong>Apply, then test in-game</strong>The zone stays a preview until you hit Apply.</div></article></section>
+<footer><span>Left + right stick · Home screen + games, controllers followed by name · <span id="firmware">Console firmware —</span></span><span>Temporary filter: re-apply after every restart.</span></footer>
+</main>
+<script>
+'use strict';
+const $=id=>document.getElementById(id);
+const canvas=$('plot'),ctx=canvas.getContext('2d');
+let inputSource=null,state=null,draft=0,angle=180,width=60,coneWidth=60,side=0,sticks=[{draft:0,angle:180,width:60,coneWidth:60},{draft:0,angle:180,width:60,coneWidth:60}],ready=false,live=false,busy=false,drag=false,lastStamp=null,trail=[],messageUntil=0,idleWarn=false,requestVersion=0;
+const percent=v=>(v/128*100).toFixed(1);
+const round=v=>Math.sign(v)*Math.floor(Math.abs(v)+0.5);
+function neutralized(x,y){
+ if(width===360)return x*x+y*y<=draft*draft;
+ const a=(angle-width/2)*Math.PI/180,b=(angle+width/2)*Math.PI/180;
+ return x*x+y*y<=draft*draft && x*round(-Math.sin(a)*1024)+y*round(Math.cos(a)*1024)>=0 && x*round(Math.sin(b)*1024)+y*round(-Math.cos(b)*1024)>=0;
+}
+function direction(a){return a+'°'+({0:' · right',90:' · down',180:' · left',270:' · up'}[a]||'');}
+const homeConfig=d=>[[d.radius,d.angle,d.width],[d.rightRadius,d.rightAngle,d.rightWidth]];
+const gameConfig=d=>[[d.gameRadius,d.gameAngle,d.gameWidth],[d.gameRightRadius,d.gameRightAngle,d.gameRightWidth]];
+const draftConfig=()=>sticks.map(k=>[k.draft,k.angle,k.width]);
+const same=(a,b)=>a.flat().join()===b.flat().join();
+const axes=d=>side?[d.rx-128,d.ry-128]:[d.lx-128,d.ly-128];
+function store(){sticks[side]={draft,angle,width,coneWidth};}
+function load(){({draft,angle,width,coneWidth}=sticks[side]);}
+function copyDraft(data){sticks=homeConfig(data).map(([r,a,w],i)=>({draft:r,angle:a,width:w,coneWidth:w!==360?w:sticks[i].coneWidth}));load();}
+function describe(r,a,w){return r?(w===360?"circle":"cone "+direction(a)+" · width "+w+"°")+" · "+percent(r)+" %":"off";}
+function describeBoth(c){return 'left '+describe(...c[0])+' · right '+describe(...c[1]);}
+function geometry(){const w=canvas.clientWidth;return {w,c:w/2,scale:(w-68)/364};}
+function warn(){
+ const box=$('warnbox');let t='';
+ if(!ready);
+ else if(draft>=182)t=width===360?'At 142 % (max), every position of the stick is neutralized.':'At maximum range, every position inside the cone is neutralized.';
+ else if(draft>128)t='Above 100 %, some full-axis tilts get swallowed too.';
+ box.textContent=t;box.classList.toggle('show',!!t);
+ $('note').classList.toggle('extreme',ready&&draft>128);
+ $('radius').closest('.adjust').classList.toggle('waiting',!ready);
+}
+function updateControls(){
+ store();const circleMode=width===360;
+ $('stickLeft').setAttribute('aria-pressed',String(!side));$('stickRight').setAttribute('aria-pressed',String(!!side));
+ $('stickLeft').disabled=$('stickRight').disabled=!ready||busy;$('picker').dataset.sel=side;
+ $('eyebrow').textContent='Calibration · '+(side?'Right':'Left')+' stick';
+ $('modeCone').setAttribute('aria-pressed',String(!circleMode));$('modeCircle').setAttribute('aria-pressed',String(circleMode));
+ $('modeCone').disabled=$('modeCircle').disabled=!ready||busy;
+ $('rangeLabel').textContent=circleMode?'Circle radius':'Cone range';
+ $('radius').setAttribute('aria-label',circleMode?'Circle radius':'Cone range');
+ $('radius').value=draft;$('radiusValue').textContent=ready?percent(draft):'—';
+ $('radius').setAttribute('aria-valuetext',percent(draft)+' percent');
+ $('angle').value=angle;$('width').value=circleMode?coneWidth:width;$('angleValue').textContent=ready?direction(angle):'—';$('widthValue').textContent=!ready?'—':circleMode?'360° · circle':width+'°';
+ $('angle').setAttribute('aria-valuetext',direction(angle));$('width').setAttribute('aria-valuetext',width+' degrees');
+ $('angle').disabled=$('width').disabled=!ready||busy||circleMode;
+ const changed=state&&(!state.enabled||!same(draftConfig(),homeConfig(state))||state.saved===false||!!state.saveError||!!state.gameError||(state.gamePid&&(!state.gameEnabled||!same(draftConfig(),gameConfig(state)))));
+ $('current').textContent=state?(state.homeAvailable===false?'Home unavailable: '+state.homeError:state.enabled?'Home: '+describeBoth(homeConfig(state))+(state.saved?' · saved for next boot':' · not saved for next boot'):'Filter disabled on the home screen'+(state.saved?'':' · saved setting may return after restart'))+(state.saveError?' · '+state.saveError:''):'Reading active setting…';
+ $('gameStatus').textContent=state?(state.gameError?'Game: '+state.gameError:!state.gamePid?'Game: waiting for a game to launch':state.gameEnabled?'Game: '+describeBoth(gameConfig(state)):'Game: filter disabled'):'Looking for a game…';
+ $('gameStatus').style.color=state&&state.gameError?'var(--err)':state&&state.gameEnabled?'var(--accent)':'var(--muted)';
+ $('inputSource').textContent=state?'Raw input: '+state.source:'';
+ $('note').textContent=circleMode?'Inside the circle, every direction is neutralized. Beyond the radius, movement stays untouched.':'Inside the cone, movement is cancelled — even on purpose. Outside the cone or beyond its range, it stays untouched.';
+ $('pending').textContent=changed?'Preview not applied yet':'';
+ $('radius').disabled=!ready||busy;$('minus').disabled=!ready||busy||draft===0;$('plus').disabled=!ready||busy||draft===182;
+ $('apply').disabled=!live||busy||!changed;$('disable').disabled=!ready||busy||!(state&&(state.homeAvailable===false||state.enabled||state.gameEnabled||state.saved===false||state.saveError));$('reset').disabled=!ready||busy||!changed;$('quit').disabled=!ready||busy;
+ for(const e of [$('radius'),$('angle'),$('width')])e.style.setProperty('--p',(e.value-e.min)/(e.max-e.min)*100+'%');
+ warn();
+}
+function setDraft(value){draft=Math.max(0,Math.min(182,Math.round(value)));updateControls();draw();}
+function meter(id,value){const el=$(id);el.style.left=(value<0?50+value/2:50)+'%';el.style.width=Math.abs(value)/2+'%';}
+</script>
+<script>
+let raf=0,lastFrame=0,target=null,shown=null,size=0;
+function draw(){if(!raf)raf=requestAnimationFrame(frame);}
+function frame(t){
+ raf=0;const dt=Math.min(100,t-(lastFrame||t));lastFrame=t;let moving=false;
+ if(live&&target){
+  if(!shown)shown=target.slice();
+  const k=1-Math.exp(-dt/40);shown[0]+=(target[0]-shown[0])*k;shown[1]+=(target[1]-shown[1])*k;
+  moving=Math.abs(target[0]-shown[0])+Math.abs(target[1]-shown[1])>.05;if(!moving)shown=target.slice();
+  const last=trail[trail.length-1];if(!last||Math.hypot(last[0]-shown[0],last[1]-shown[1])>.4)trail.push([shown[0],shown[1],t]);
+ }else shown=null;
+ while(trail.length&&t-trail[0][2]>600)trail.shift();
+ render(t);
+ if(moving||trail.length)draw();
+}
+function render(t){
+ const {w,c,scale}=geometry();if(!w)return;
+ const dpr=window.devicePixelRatio||1;if(size!==w*dpr){size=w*dpr;canvas.width=canvas.height=Math.round(size);}
+ ctx.setTransform(dpr,0,0,dpr,0,0);ctx.clearRect(0,0,w,w);
+ const R=128*scale,TAU=Math.PI*2;
+ const ring=(r,color,lw,dash=[])=>{ctx.strokeStyle=color;ctx.lineWidth=lw;ctx.setLineDash(dash);ctx.beginPath();ctx.arc(c,c,r,0,TAU);ctx.stroke();ctx.setLineDash([]);};
+ let g=ctx.createRadialGradient(c,c,0,c,c,182*scale);g.addColorStop(0,'#162033');g.addColorStop(.7,'#101724');g.addColorStop(1,'#0c111b00');
+ ctx.fillStyle=g;ctx.beginPath();ctx.arc(c,c,182*scale,0,TAU);ctx.fill();
+ ring(182*scale,'#1d2638',1,[2,6]);
+ for(const r of [32,64,96])ring(r*scale,'#1c2537',1);
+ ring(R,'#34425c',1.25);
+ ctx.strokeStyle='#202a3d';ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(c-182*scale,c);ctx.lineTo(c+182*scale,c);ctx.moveTo(c,c-182*scale);ctx.lineTo(c,c+182*scale);ctx.stroke();
+ for(let d=0;d<360;d+=15){const q=d*Math.PI/180,l=d%90?5:10;ctx.strokeStyle=d%90?'#2c3850':'#4a5a78';ctx.beginPath();ctx.moveTo(c+Math.cos(q)*(R+3),c+Math.sin(q)*(R+3));ctx.lineTo(c+Math.cos(q)*(R+3+l),c+Math.sin(q)*(R+3+l));ctx.stroke();}
+ ctx.font='600 10px -apple-system,BlinkMacSystemFont,sans-serif';ctx.fillStyle='#55627b';ctx.textBaseline='middle';
+ ctx.textAlign='center';ctx.fillText('UP',c,12);ctx.fillText('DOWN',c,w-10);ctx.textAlign='left';ctx.fillText('LEFT',4,c-10);ctx.textAlign='right';ctx.fillText('RIGHT',w-4,c-10);
+ if(ready){const a=(angle-width/2)*Math.PI/180,b=(angle+width/2)*Math.PI/180,zr=Math.max(draft*scale,.01);
+ g=ctx.createRadialGradient(c,c,0,c,c,zr);g.addColorStop(0,'#39e0a80a');g.addColorStop(1,'#39e0a838');
+ ctx.fillStyle=g;ctx.strokeStyle='#39e0a8';ctx.lineWidth=1.5;ctx.lineJoin='round';ctx.shadowColor='#39e0a880';ctx.shadowBlur=10;
+ ctx.beginPath();if(width!==360)ctx.moveTo(c,c);ctx.arc(c,c,zr,a,b);ctx.closePath();ctx.fill();ctx.stroke();ctx.shadowBlur=0;
+ const hx=c+Math.cos(angle*Math.PI/180)*zr,hy=c+Math.sin(angle*Math.PI/180)*zr;
+ ctx.fillStyle='#0b1512';ctx.beginPath();ctx.arc(hx,hy,7,0,TAU);ctx.fill();ctx.stroke();ctx.fillStyle='#39e0a8';ctx.beginPath();ctx.arc(hx,hy,2.5,0,TAU);ctx.fill();}
+ ctx.textBaseline='alphabetic';
+ if(!state||!live||!shown){ctx.textAlign='center';ctx.fillStyle='#7d8ba4';ctx.font='500 12px -apple-system,BlinkMacSystemFont,sans-serif';ctx.fillText('Waiting for controller input',c,c+40);return;}
+ ctx.lineCap='round';
+ for(let i=1;i<trail.length;i++){const age=1-(t-trail[i][2])/600;ctx.strokeStyle='rgba(122,168,255,'+(.55*age*age).toFixed(3)+')';ctx.lineWidth=1+2.5*age;ctx.beginPath();ctx.moveTo(c+trail[i-1][0]*scale,c+trail[i-1][1]*scale);ctx.lineTo(c+trail[i][0]*scale,c+trail[i][1]*scale);ctx.stroke();}
+ const [dx,dy]=axes(state),neutral=neutralized(dx,dy),x=c+shown[0]*scale,y=c+shown[1]*scale;
+ ctx.strokeStyle='#7aa8ff40';ctx.lineWidth=1;ctx.setLineDash([2,4]);ctx.beginPath();ctx.moveTo(c,c);ctx.lineTo(x,y);ctx.stroke();ctx.setLineDash([]);
+ g=ctx.createRadialGradient(x,y,0,x,y,22);g.addColorStop(0,'#7aa8ff55');g.addColorStop(1,'#7aa8ff00');ctx.fillStyle=g;ctx.beginPath();ctx.arc(x,y,22,0,TAU);ctx.fill();
+ ctx.fillStyle='#eaf1ff';ctx.beginPath();ctx.arc(x,y,6,0,TAU);ctx.fill();ctx.strokeStyle='#7aa8ff';ctx.lineWidth=2.5;ctx.stroke();
+ const fx=neutral?c:x,fy=neutral?c:y;ctx.strokeStyle='#39e0a8';ctx.lineWidth=2;ctx.beginPath();ctx.arc(fx,fy,12,0,TAU);ctx.stroke();
+ const label=percent(Math.hypot(dx,dy))+' %';ctx.font='600 11px -apple-system,BlinkMacSystemFont,sans-serif';const lw=ctx.measureText(label).width+14;
+ const lx=Math.min(w-lw-4,Math.max(4,x+18)),ly=Math.max(4,y-32);ctx.fillStyle='#0b0e14cc';ctx.strokeStyle='#2f3d55';ctx.lineWidth=1;ctx.beginPath();ctx.roundRect(lx,ly,lw,20,10);ctx.fill();ctx.stroke();
+ ctx.fillStyle='#c9d6ee';ctx.textAlign='left';ctx.fillText(label,lx+7,ly+14);
+ if(idleWarn){ctx.textAlign='center';ctx.fillStyle='#ffb454';ctx.font='600 13px -apple-system,BlinkMacSystemFont,sans-serif';ctx.fillText('Both sticks are centered',c,c-10);ctx.fillStyle='#8a97ad';ctx.font='11.5px -apple-system,BlinkMacSystemFont,sans-serif';ctx.fillText('Move a stick to check the read-out',c,c+12);ctx.fillText('Centered samples alone do not prove input is unavailable',c,c+28);}
+}
+</script>
+<script>
+function acceptState(data){
+ if(inputSource!==data.source){trail=[];inputSource=data.source;}
+ state=data;ready=true;$('firmware').textContent='Console firmware '+data.firmware+' · Build '+(data.buildId||'unknown').slice(0,12);live=!!(data.connected&&data.fresh);idleWarn=live&&data.idle===true;
+ if(lastStamp===null&&data.homeAvailable!==false)copyDraft(data);
+ if(data.homeAvailable!==false)lastStamp=data.timestamp;const [ax,ay]=axes(data);target=live?[ax,ay]:null;
+ $('connection').classList.toggle('live',live);$('connectionText').textContent=live?idleWarn?'Controller live - sticks centered':'Controller live':data.connected?'Read-out paused':'Controller disconnected';
+ $('plotPanel').classList.toggle('offline',!live);$('plotBadge').textContent=idleWarn?'CENTERED':live?'LIVE':'STANDBY';$('plotBadge').className='chip'+(idleWarn?' warn':live?' live':'');$('idleHint').hidden=!idleWarn;
+ $('xValue').textContent=live?percent(ax):'—';$('yValue').textContent=live?percent(-ay):'—';
+ $('amplitude').textContent=live?percent(Math.hypot(ax,ay))+' %':'—';
+ meter('xMeter',live?ax/128*100:0);meter('yMeter',live?-ay/128*100:0);
+ const dx=live?ax:null,dy=live?ay:null,neutral=dx!==null?neutralized(dx,dy):false;
+ $('outputState').textContent=dx!==null?(neutral?'Snapped to center':'Kept as-is'):'Read-out unavailable';
+ $('outputStateBox').classList.toggle('dead',dx!==null&&neutral);
+ for(const [i,x,y] of [[0,data.lx,data.ly],[1,data.rx,data.ry]])$('picker').querySelector('#cap'+i).style.transform=live?'translate('+(x-128)/18+'px,'+(y-128)/18+'px)':'';
+ updateControls();draw();
+}
+function message(text,error=false){$('message').textContent=text;$('message').classList.toggle('error',error);messageUntil=Date.now()+6500;}
+async function poll(){
+ const version=requestVersion;
+ if(!busy&&!document.hidden){try{const res=await fetch('/api/state',{cache:'no-store',signal:AbortSignal.timeout(12000)});const data=await res.json();if(!res.ok)throw Error(data.error||'Console unavailable');if(version!==requestVersion)return;acceptState(data);if(Date.now()>messageUntil)$('message').textContent='';}
+ catch(e){if(version!==requestVersion)return;live=false;ready=false;trail=[];idleWarn=false;$('idleHint').hidden=true;$('connection').classList.remove('live');$('connectionText').textContent='Connection lost';$('plotPanel').classList.add('offline');$('plotBadge').textContent='OFFLINE';$('plotBadge').className='chip warn';message(e.message,true);updateControls();draw();}finally{setTimeout(poll,30);}}else setTimeout(poll,30);
+}
+async function command(path,body=''){
+ ++requestVersion;busy=true;$('apply').classList.add('busy');updateControls();message('Applying…');
+ try{const res=await fetch(path,{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded','X-Deadzone-Request':'1'},body,signal:AbortSignal.timeout(15000)});const data=await res.json();if(!res.ok)throw Error(data.error||'Setting not applied');if(data.closed){++requestVersion;message('Filter off, payload stopped. Send the payload again to reconfigure.');return;}copyDraft(data);acceptState(data);message(data.saveError||data.gameError||(data.saved===false?'Setting updated, but persistence is not confirmed.':data.enabled?'Applied and saved. Supported games follow this deadzone.':'Filter disabled on the home screen and in the game.'),!!data.saveError||!!data.gameError||data.saved===false);}
+ catch(e){message(e.message,true);}finally{busy=false;$('apply').classList.remove('busy');updateControls();}
+}
+$('radius').addEventListener('input',e=>setDraft(Number(e.target.value)));
+$('minus').onclick=()=>setDraft(draft-1);$('plus').onclick=()=>setDraft(draft+1);
+$('modeCircle').onclick=()=>{if(width!==360)coneWidth=width;width=360;updateControls();draw();};
+$('modeCone').onclick=()=>{width=coneWidth;updateControls();draw();};
+$('angle').addEventListener('input',e=>{angle=Number(e.target.value);updateControls();draw();});
+$('width').addEventListener('input',e=>{width=coneWidth=Number(e.target.value);updateControls();draw();});
+$('reset').onclick=()=>{if(state){copyDraft(state);updateControls();draw();}};
+$('apply').onclick=()=>{store();const [l,r]=sticks;command('/api/apply','radius='+l.draft+'&angle='+l.angle+'&width='+l.width+'&rightRadius='+r.draft+'&rightAngle='+r.angle+'&rightWidth='+r.width);};
+function pickStick(s){if(s===side)return;store();side=s;load();trail=[];shown=null;if(state)acceptState(state);else{updateControls();draw();}}
+$('stickLeft').onclick=()=>pickStick(0);$('stickRight').onclick=()=>pickStick(1);
+$('picker').querySelector('.pad').addEventListener('click',e=>{const g=e.target.closest('[data-pick]');if(g&&!$('stickLeft').disabled)pickStick(+g.dataset.pick);});
+$('disable').onclick=()=>command('/api/disable');
+$('quit').onclick=()=>{if(confirm('Turn the filter off and stop the payload? Send it again to reconfigure.'))command('/api/close');};
+function pointerRadius(e){const r=canvas.getBoundingClientRect(),g=geometry(),x=e.clientX-r.left-g.c,y=e.clientY-r.top-g.c;if(width!==360&&Math.hypot(x,y)>4)angle=(Math.round(Math.atan2(y,x)*180/Math.PI)+360)%360;return Math.hypot(x,y)/g.scale;}
+canvas.addEventListener('pointerdown',e=>{if(!ready||busy)return;drag=true;canvas.setPointerCapture(e.pointerId);setDraft(pointerRadius(e));});
+canvas.addEventListener('pointermove',e=>{if(drag)setDraft(pointerRadius(e));});
+canvas.addEventListener('pointerup',()=>drag=false);canvas.addEventListener('pointercancel',()=>drag=false);
+canvas.addEventListener('wheel',e=>{if(!ready||busy)return;e.preventDefault();setDraft(draft+(e.deltaY<0?1:-1));},{passive:false});
+canvas.addEventListener('keydown',e=>{if(!ready||busy)return;if(['ArrowLeft','ArrowDown','ArrowRight','ArrowUp'].includes(e.key)){e.preventDefault();setDraft(draft+(['ArrowRight','ArrowUp'].includes(e.key)?1:-1));}});
+window.addEventListener('resize',draw);updateControls();draw();poll();
+</script>
+</body></html>
