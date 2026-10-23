@@ -101,12 +101,13 @@ int dz_write_remote(pid_t pid, uintptr_t addr, const void *buf, size_t size) {
     return 0;
 }
 
+#define DZ_MAX_SLOTS 16
 static struct {
     pid_t pid;
     int count;
     struct timeval started;
-    uintptr_t base, pad, cave, slots[6];
-    int kinds[6], enabled;
+    uintptr_t base, pad, cave, slots[DZ_MAX_SLOTS];
+    int kinds[DZ_MAX_SLOTS], enabled;
     uintptr_t funcs[DZ_PAD_FUNCS];
     struct dz_config config;
 } target;
@@ -156,20 +157,12 @@ static int locate(pid_t pid) {
     if (dz_pad_funcs(pid, target.pad, target.funcs) ||
         dz_pad_thunks(pid, target.pad, target.funcs, dz_read_remote))
         return fail("Controller library not recognized");
-    /* SceShellUI's two reader families point at the fixed offsets inside the
-     * library (0x2960: thunk; 0x29a0: standalone), NOT at dlsym's resolution
-     * of scePadReadForTracker: on the validated 10.20 layout dlsym resolves
-     * it 0x5a0 bytes away (pad+0x2f00) and no import points there. Both
-     * offsets are pinned by signature, so a different library fails loudly
-     * instead of hooking the wrong original. */
-    const unsigned char first[] = {0x31,0xd2,0xe9,0x69,0xec,0xff,0xff};
-    const unsigned char second[] = {0x55,0x48,0x89,0xe5,0x41,0x56,0x53,0x48,0x81,0xec,0xb0,0,0,0};
-    if (verify(pid, target.pad + 0x2960, first, sizeof(first)) ||
-        verify(pid, target.pad + 0x29a0, second, sizeof(second)) ||
-        target.pad + 0x29a0 == target.funcs[0])
-        return fail("Reader layout not recognised");
-    target.funcs[0] = target.pad + 0x2960;
-    target.funcs[4] = target.pad + 0x29a0;
+    /* The readers are the five dlsym resolves in this process, which
+     * dz_pad_thunks has just cross-checked against the library's own code.
+     * The 10.20 build overrode two of them with pinned offsets (0x2960,
+     * 0x29a0); 13.60 places the same thunk pair at +0x3080..+0x30b0 over
+     * +0x1a70/+0x1e50 and the standalone tracker at +0x3840, so no offset is
+     * assumed here. */
     /* The filter code lives in an empty gap of the home screen's own program
      * image (never inside a shared library). A previously deployed filter is
      * recognised by its signature so it is updated in place; on a fresh boot
@@ -275,9 +268,12 @@ static int locate(pid_t pid) {
          * home screen's own image and the shared-library images. Every such
          * mapping is scanned, so a firmware that imports more or fewer
          * readers is simply counted. */
-        if (vm->kve_protection != KVME_PROT_READ || end <= start || end - start > 2 * 1024 * 1024)
+        /* The home screen's import slots sit in its own image: the relro and
+         * data segments that follow the code. Every readable mapping of the
+         * image is scanned, whatever protection it carries. */
+        if (!(vm->kve_protection & KVME_PROT_READ) || end <= start || end - start > 2 * 1024 * 1024)
             continue;
-        if (!(start >= 0x800000000ull && end <= 0x900000000ull))
+        if (start < target.base || end > target.base + 0x1500000ull)
             continue;
         scanned += end - start;
         if (scanned > 128 * 1024 * 1024) { failed = 1; break; }
@@ -287,39 +283,29 @@ static int locate(pid_t pid) {
             for (size_t pos = 0; pos + 8 <= bytes; pos += 8) {
                 uintptr_t pointer;
                 memcpy(&pointer, page + pos, 8);
+                /* The home blob carries two entries only: the state120 reader
+                 * and the 168-byte tracker. Slots that reach the batch readers
+                 * are left alone. */
                 int kind = -1;
                 if (pointer == target.funcs[0] || pointer == target.cave) kind = 0;
                 if (pointer == target.funcs[4] || pointer == target.cave + 32) kind = 1;
                 if (kind < 0) continue;
                 /* More imported readers than we can hold: unknown layout. */
-                if (found >= 6) { failed = 1; break; }
+                if (found >= DZ_MAX_SLOTS) { failed = 1; break; }
                 target.slots[found] = addr + pos;
                 target.kinds[found++] = kind;
             }
         }
     }
-    /* The home screen also imports the two readers inside its own program
-     * image (SceShellUI), in a mapping this scan cannot see; those two
-     * imports feed the on-screen cursor. Their image offsets come from the
-     * validated layout; validate() re-checks their actual pointers, so a
-     * wrong offset fails loudly ("Unexpected import") instead of leaving
-     * the home screen silently half hooked. All six imports, or nothing. */
-    for (int i = 0; i < 2; ++i) {
-        uintptr_t anchor = target.base + (i ? 0x101a768 : 0x1019690);
-        int seen = 0;
-        for (int j = 0; j < found; ++j) if (target.slots[j] == anchor) seen = 1;
-        if (seen) continue;
-        if (found >= 6) { failed = 1; break; }
-        target.slots[found] = anchor;
-        target.kinds[found++] = i;
-    }
+    /* The two extra anchors the 10.20 build appended were image offsets of
+     * that firmware; they are gone. Everything found above is a real import
+     * slot, and validate() re-checks each pointer before anything is written,
+     * so a wrong slot fails loudly instead of half hooking the home screen.
+     * 13.60 keeps a single scePadReadState slot in its relro segment, where
+     * 10.20 had six, so any count from one upwards is accepted. */
     free(maps); free(page);
-    if (failed || !cave_ok || found != 6)
+    if (failed || !cave_ok || found < 1)
         return fail("The controller reads are not identified");
-    {   int kind0 = 0, kind1 = 0;
-        for (int i = 0; i < found; ++i) target.kinds[i] ? ++kind1 : ++kind0;
-        if (!kind0 || !kind1) return fail("The controller reads are not identified");
-    }
     target.count = found;
     return validate();
 }
@@ -339,47 +325,64 @@ static int ensure(void) {
     return validate();
 }
 
-/* records = 0x8ae0 bytes at pad + 0x20018: 24 handle caches of 0x5c8 bytes,
- * handle id at +0x1c, state sample at +0x4b8, tracking sample at +0x538.
- * SceShellUI keeps a second handle that is fed fresh, all-neutral samples
- * slightly ahead of the real pad: among samples within 100 ms of the newest,
- * one with an axis off neutral wins. */
-const unsigned char *dz_active_sample(const unsigned char *records, uint64_t *stamp) {
-    const unsigned char *samples[48];
-    uint64_t stamps[48], newest = 0;
-    int count = 0;
-    for (int i = 0; i < 24; ++i) {
-        const unsigned char *slot = records + (size_t)i * 0x5c8;
-        uint32_t handle;
-        memcpy(&handle, slot + 0x1c, 4);
-        if (!handle) continue;
-        const unsigned offsets[2] = {0x4b8, 0x538};
-        for (int k = 0; k < 2; ++k) {
-            const unsigned char *p = slot + offsets[k];
-            if (p[76] != 1) continue;
-            memcpy(&stamps[count], p + 80, 8);
-            if (stamps[count] > newest) newest = stamps[count];
-            samples[count++] = p;
+/* 13.60 layout: the handle caches of libScePad live in its rw- segment, which
+ * starts at pad + 0x24000 and is 64 KB. A state sample in there is a ScePadData
+ * copy with the connected flag at +76 and a microsecond timestamp at +80; the
+ * 0x5c8-byte records with a handle id at +0x1c that the 10.20 build walked are
+ * not there at all.
+ *
+ * Picking the right sample cannot be done from one snapshot: the segment holds
+ * dozens of structures that happen to have 1 at +76 and a plausible value at
+ * +80, and one of them carries 0xffffffff, which wins any "newest" test. What
+ * identifies the live sample is that its timestamp ADVANCES between two reads a
+ * few milliseconds apart, so the segment is read twice and only candidates
+ * whose stamp moved forward are kept.
+ *
+ * Among those, a sample with an axis off neutral wins: SceShellUI keeps a
+ * second handle fed all-neutral samples slightly ahead of the real pad, and
+ * only the real one shows drift. Ties go to the newer stamp. */
+static size_t dz_pick_sample(const unsigned char *a, const unsigned char *b, uint64_t *stamp) {
+    size_t best = 0;
+    uint64_t best_stamp = 0;
+    int best_motion = -1;
+    for (size_t off = 0; off + 96 <= DZ_REC_LEN; off += 8) {
+        if (a[off + 76] != 1 || b[off + 76] != 1) continue;
+        uint64_t s1, s2;
+        memcpy(&s1, a + off + 80, 8);
+        memcpy(&s2, b + off + 80, 8);
+        if (!s1 || !s2 || (s1 >> 32) || (s2 >> 32) || s2 <= s1) continue;
+        if (s2 - s1 > 1000000) continue;   /* not a microsecond tick */
+        int m = motion_seen(b + off);
+        if (m > best_motion || (m == best_motion && s2 > best_stamp)) {
+            best = off; best_stamp = s2; best_motion = m;
         }
     }
-    const unsigned char *sample = NULL;
-    int moving = 0;
+    *stamp = best_stamp;
+    return best;
+}
+
+/* Two reads of the segment, ~20 ms apart, from any process: the home screen and
+ * a game both map the same library. Returns 0 with *data NULL when nothing is
+ * advancing, which the server reports as "controller disconnected". */
+int dz_pad_sample(int pid, uintptr_t pad, const unsigned char **data, uint64_t *stamp) {
+    static unsigned char first[DZ_REC_LEN], second[DZ_REC_LEN];
+    *data = NULL;
     *stamp = 0;
-    for (int i = 0; i < count; ++i) {
-        if (newest - stamps[i] > 100000) continue;
-        int m = motion_seen(samples[i]);
-        if (m > moving || (m == moving && stamps[i] > *stamp)) { sample = samples[i]; *stamp = stamps[i]; moving = m; }
-    }
-    return sample;
+    if (dz_read_remote(pid, pad + DZ_REC_OFF, first, sizeof(first))) return -1;
+    usleep(20000);
+    if (dz_read_remote(pid, pad + DZ_REC_OFF, second, sizeof(second))) return -1;
+    size_t off = dz_pick_sample(first, second, stamp);
+    if (off) *data = second + off;
+    else *stamp = 0;
+    return 0;
 }
 
 int dz_read(struct dz_state *out) {
     if (ensure()) return -1;
-    static unsigned char records[0x8ae0];
-    if (dz_read_remote(target.pid, target.pad + 0x20018, records, sizeof(records)))
+    uint64_t stamp = 0;
+    const unsigned char *data = NULL;
+    if (dz_pad_sample(target.pid, target.pad, &data, &stamp))
         return fail("Cannot read controller");
-    uint64_t stamp;
-    const unsigned char *data = dz_active_sample(records, &stamp);
     *out=(struct dz_state){.pid=target.pid,.enabled=target.enabled,.config=target.config,
         .started=(uint64_t)target.started.tv_sec*1000000+(uint64_t)target.started.tv_usec};
     if (dz_sample(out,&observation,data,stamp,dz_milliseconds()))

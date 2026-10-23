@@ -245,7 +245,7 @@ function updateControls(){
  $('note').textContent=circleMode?'Inside the circle, every direction is neutralized. Beyond the radius, movement stays untouched.':'Inside the cone, movement is cancelled — even on purpose. Outside the cone or beyond its range, it stays untouched.';
  $('pending').textContent=changed?'Preview not applied yet':'';
  $('radius').disabled=!ready||busy;$('minus').disabled=!ready||busy||draft===0;$('plus').disabled=!ready||busy||draft===182;
- $('apply').disabled=!live||busy||!changed;$('disable').disabled=!ready||busy||!(state&&(state.homeAvailable===false||state.enabled||state.gameEnabled||state.saved===false||state.saveError));$('reset').disabled=!ready||busy||!changed;$('quit').disabled=!ready||busy;
+ $('apply').disabled=!ready||busy||!changed;$('disable').disabled=!ready||busy||!(state&&(state.homeAvailable===false||state.enabled||state.gameEnabled||state.saved===false||state.saveError));$('reset').disabled=!ready||busy||!changed;$('quit').disabled=!ready||busy;
  for(const e of [$('radius'),$('angle'),$('width')])e.style.setProperty('--p',(e.value-e.min)/(e.max-e.min)*100+'%');
  warn();
 }
