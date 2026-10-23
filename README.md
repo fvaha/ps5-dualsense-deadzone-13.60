@@ -1,5 +1,16 @@
 # ps5-dualsense-deadzone
 
+> **This fork is the firmware 13.60 build.**
+> Upstream ([Iziman127/ps5-dualsense-deadzone](https://github.com/Iziman127/ps5-dualsense-deadzone)) is
+> written and tested against 10.20 and answers 13.60 with *"Controller library not recognized"*:
+> the reader offsets, the import-slot window, the expected slot count and the live read-out table are
+> all 10.20-specific. What has to change for 13.60 — with every measurement taken from a real console —
+> is in [FIRMWARE-13.60.md](FIRMWARE-13.60.md). Those 10.20 paths are **replaced**, so this build
+> targets 13.60 only.
+>
+> Verified on hardware (CFI-1216, FW 13.60, kstuff + etaHEN): locate, apply, disable and restore on the
+> home screen, the same inside a running game, and a working live stick read-out in both.
+
 An in-memory deadzone filter for the sticks of a DualSense on a jailbroken
 PlayStation 5, for controllers that drift in one direction.
 
